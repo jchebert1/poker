@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en" data-theme="felt" data-mode="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dev login · Poker</title><link rel="stylesheet" href="/styles.css"></head>
+<body><div id="login-gate"><div class="card-panel">
+<h2>Dev-mode login</h2>
+<p class="muted small">AUTH_MODE=dev is on: no Cloudflare Access. Pick any email-like id to play as. Use one of the ADMIN_EMAILS to be admin.</p>
+<form id="f" style="display:flex;flex-direction:column;gap:.6rem"><label>Email <input name="email" type="email" required placeholder="you@example.com"></label><button class="btn primary">Enter</button></form>
+</div></div>
+<script>
+document.getElementById('f').onsubmit = async (e) => { e.preventDefault(); const r = await fetch('/dev/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e.target.email.value }) }); if (r.ok) location.href = '/'; else alert((await r.json()).error); };
+</script></body></html>

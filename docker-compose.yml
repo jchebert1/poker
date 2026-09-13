@@ -1,0 +1,31 @@
+# Portainer stack: the poker app + the Cloudflare Tunnel connector.
+# The app has NO published ports; the only way in is through the tunnel (and therefore through Cloudflare Access).
+# Set CF_TUNNEL_TOKEN, CF_TEAM_DOMAIN, CF_POLICY_AUD and ADMIN_EMAILS as stack environment variables in Portainer.
+services:
+  poker:
+    image: ghcr.io/jchebert1/poker:latest
+    container_name: poker
+    restart: unless-stopped
+    environment:
+      AUTH_MODE: ${AUTH_MODE:-cloudflare}
+      CF_TEAM_DOMAIN: ${CF_TEAM_DOMAIN}
+      CF_POLICY_AUD: ${CF_POLICY_AUD}
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
+      PORT: "3000"
+      DATA_DIR: /data
+    volumes:
+      - poker-data:/data
+    # Uncomment to also reach it directly on your LAN (e.g. for AUTH_MODE=dev testing). Keep commented in production.
+    # ports:
+    #   - "3000:3000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: poker-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    depends_on:
+      - poker
+
+volumes:
+  poker-data:

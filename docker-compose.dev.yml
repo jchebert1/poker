@@ -1,0 +1,14 @@
+# Local/LAN testing without Cloudflare:  docker compose -f docker-compose.dev.yml up --build
+# Then open http://<host>:3000 and pick any email on the dev login page (ADMIN_EMAILS gets admin).
+services:
+  poker:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      AUTH_MODE: dev
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-jchebert1@gmail.com}
+    volumes:
+      - poker-dev-data:/data
+volumes:
+  poker-dev-data:

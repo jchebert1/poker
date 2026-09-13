@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" data-theme="felt" data-mode="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Bear-Net Poker</title>
+<meta name="theme-color" content="#0f2d1f">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand"><span class="brand-icon">🐻</span><span id="table-name">Bear-Net Poker</span></div>
+    <div class="topbar-right">
+      <div id="blinds-pill" class="pill" hidden></div>
+      <button id="btn-theme" class="icon-btn" title="Theme">🎨</button>
+      <button id="btn-mode" class="icon-btn" title="Dark / light">🌙</button>
+      <button id="btn-profile" class="icon-btn avatar-btn" title="Profile"><span id="me-avatar">🙂</span></button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- LOBBY -->
+    <section id="lobby" hidden>
+      <div class="lobby-grid">
+        <div class="card-panel" id="lobby-players">
+          <h2>Players <span id="player-count" class="muted"></span></h2>
+          <ul id="player-list"></ul>
+          <div class="row wrap gap" id="lobby-actions">
+            <button id="btn-sit" class="btn primary">Sit down</button>
+            <button id="btn-stand" class="btn" hidden>Stand up</button>
+          </div>
+          <div class="admin-only row wrap gap" id="lobby-admin">
+            <label>Bot level
+              <select id="bot-level">
+                <option value="1">1 · Fish</option><option value="2" selected>2 · Casual</option><option value="3">3 · Regular</option><option value="4">4 · Shark</option><option value="5">5 · Pro</option>
+              </select>
+            </label>
+            <button id="btn-add-bot" class="btn">+ Add bot</button>
+            <button id="btn-start" class="btn primary big">▶ Start game</button>
+          </div>
+          <p class="muted small" id="lobby-hint"></p>
+        </div>
+
+        <div class="card-panel" id="lobby-settings">
+          <h2>Table settings <span class="muted small admin-only">(admin)</span></h2>
+          <form id="settings-form" class="settings-grid" autocomplete="off">
+            <label>Table name <input name="tableName" type="text" maxlength="40"></label>
+            <label>Starting stack <input name="startingStack" type="number" min="20" step="10"></label>
+            <label>Small blind <input name="smallBlind" type="number" min="1"></label>
+            <label>Big blind <input name="bigBlind" type="number" min="1"></label>
+            <label>Action timer (sec) <input name="actionTimeSec" type="number" min="5" max="600"></label>
+            <label>Max players <input name="maxPlayers" type="number" min="2" max="10"></label>
+            <label>Blinds up every (min, 0=never) <input name="blindsIncreaseEveryMin" type="number" min="0"></label>
+            <label>Blinds multiplier <input name="blindsIncreaseFactor" type="number" min="1" max="10" step="0.5"></label>
+            <label>Showdown pause (sec) <input name="showdownPauseSec" type="number" min="2" max="60"></label>
+            <label>Starting theme <select name="theme"></select></label>
+            <label class="check"><input name="allowRebuy" type="checkbox"> Allow rebuys</label>
+            <label class="check"><input name="botsAutoRebuy" type="checkbox"> Bots auto-rebuy</label>
+            <div class="row gap admin-only settings-actions"><button type="submit" class="btn primary">Save settings</button><span id="settings-status" class="muted small"></span></div>
+          </form>
+        </div>
+
+        <div class="card-panel" id="summary-panel" hidden>
+          <h2>Last game results</h2>
+          <div id="summary-body"></div>
+          <button id="btn-clear-summary" class="btn admin-only">Dismiss</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLE -->
+    <section id="game" hidden>
+      <div id="table-wrap">
+        <div id="table">
+          <div id="felt">
+            <div id="board">
+              <div id="pot" class="pot"></div>
+              <div id="community" class="cards"></div>
+              <div id="street-label" class="muted small"></div>
+            </div>
+          </div>
+          <div id="seats"></div>
+        </div>
+      </div>
+      <div id="result-banner" class="banner" hidden></div>
+      <div id="paused-banner" class="banner" hidden>⏸ Game paused by admin</div>
+
+      <div id="action-bar" hidden>
+        <div class="row gap actions-main">
+          <button class="btn danger" data-act="fold">Fold</button>
+          <button class="btn" data-act="check">Check</button>
+          <button class="btn" data-act="call">Call</button>
+          <button class="btn primary" data-act="raise">Raise</button>
+          <button class="btn warn" data-act="allin">All-in</button>
+        </div>
+        <div class="row gap raise-row">
+          <div class="presets">
+            <button class="chip-btn" data-preset="min">Min</button>
+            <button class="chip-btn" data-preset="half">½ pot</button>
+            <button class="chip-btn" data-preset="pot">Pot</button>
+            <button class="chip-btn" data-preset="max">Max</button>
+          </div>
+          <input type="range" id="raise-slider">
+          <input type="number" id="raise-amount" min="0">
+        </div>
+        <div id="timer-bar"><div id="timer-fill"></div></div>
+      </div>
+
+      <div id="rebuy-bar" class="banner" hidden>
+        <span>You're out of chips.</span>
+        <button id="btn-rebuy" class="btn primary">Rebuy for <span id="rebuy-amt"></span></button>
+        <button id="btn-leave-game" class="btn">Leave table</button>
+      </div>
+
+      <div id="game-controls" class="row gap wrap">
+        <button id="btn-join-game" class="btn primary" hidden>Join table</button>
+        <button id="btn-sitout" class="btn small-btn" hidden>Sit out</button>
+        <button id="btn-stand-game" class="btn small-btn" hidden>Leave</button>
+        <span class="spacer"></span>
+        <button id="btn-side" class="btn small-btn">💬 Log</button>
+        <span class="admin-only row gap">
+          <select id="bot-level-game" class="small">
+            <option value="1">L1</option><option value="2" selected>L2</option><option value="3">L3</option><option value="4">L4</option><option value="5">L5</option>
+          </select>
+          <button id="btn-add-bot-game" class="btn small-btn">+ Bot</button>
+          <button id="btn-pause" class="btn small-btn">⏸ Pause</button>
+          <button id="btn-end" class="btn small-btn danger">■ End game</button>
+        </span>
+      </div>
+    </section>
+  </main>
+
+  <!-- side panel: log + chat -->
+  <aside id="side" hidden>
+    <div class="side-tabs"><button data-tab="log" class="active">Log</button><button data-tab="chat">Chat</button><button data-tab="players">Players</button><span class="spacer"></span><button id="btn-side-close" class="icon-btn">✕</button></div>
+    <div id="side-log" class="side-body"></div>
+    <div id="side-chat" class="side-body" hidden></div>
+    <div id="side-players" class="side-body" hidden></div>
+    <form id="chat-form" class="row gap" hidden><input id="chat-input" placeholder="Say something…" maxlength="300"><button class="btn small-btn">Send</button></form>
+  </aside>
+
+  <!-- theme picker -->
+  <div id="theme-menu" class="popover" hidden>
+    <div class="popover-title">Table theme</div>
+    <div id="theme-list"></div>
+    <p class="muted small" id="theme-note">Your pick is queued and switches for everyone when it's your turn.</p>
+  </div>
+
+  <!-- profile dialog -->
+  <dialog id="profile-dialog">
+    <form method="dialog" id="profile-form">
+      <h2>Your player</h2>
+      <p class="muted small" id="profile-email"></p>
+      <label>Display name <input name="name" maxlength="24" required></label>
+      <div class="avatar-preview"><span id="avatar-preview"></span></div>
+      <div class="avatar-grid" id="avatar-grid"></div>
+      <label class="row gap">Or upload a picture <input type="file" id="avatar-file" accept="image/*"></label>
+      <div class="row gap end"><button type="button" class="btn" id="profile-cancel">Cancel</button><button class="btn primary" value="save">Save</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" hidden></div>
+  <div id="login-gate" hidden>
+    <div class="card-panel">
+      <h2>Signing you in…</h2>
+      <p id="login-msg" class="muted">Waiting for Cloudflare Access.</p>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
