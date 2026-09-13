@@ -219,6 +219,9 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 .avatar-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: .3rem; }
 .avatar-grid button { background: var(--bg); border: 2px solid var(--panel-border); border-radius: 8px; font-size: 1.3rem; cursor: pointer; padding: .2rem 0; }
 .avatar-grid button.sel { border-color: var(--accent); }
+.bot-levels { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0 .8rem; }
+.bot-levels .btn { display: flex; justify-content: space-between; align-items: center; text-align: left; }
+.bot-levels .btn span { color: var(--muted); font-weight: 400; font-size: .8rem; }
 #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--danger); color: #fff; padding: .6rem 1rem; border-radius: 10px; z-index: 50; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
 #toast.ok { background: var(--ok); color: #062; }
 #login-gate { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 60; padding: 1rem; }

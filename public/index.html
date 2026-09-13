@@ -31,14 +31,9 @@
             <button id="btn-sit" class="btn primary">Sit down</button>
             <button id="btn-stand" class="btn" hidden>Stand up</button>
           </div>
-          <div class="admin-only row wrap gap" id="lobby-admin">
-            <label>Bot level
-              <select id="bot-level">
-                <option value="1">1 · Fish</option><option value="2" selected>2 · Casual</option><option value="3">3 · Regular</option><option value="4">4 · Shark</option><option value="5">5 · Pro</option>
-              </select>
-            </label>
-            <button id="btn-add-bot" class="btn">+ Add bot</button>
-            <button id="btn-start" class="btn primary big">▶ Start game</button>
+          <div class="row wrap gap" id="lobby-bots">
+            <button id="btn-add-bot" class="btn">🤖 Add bot</button>
+            <button id="btn-start" class="btn primary big admin-only">▶ Start game</button>
           </div>
           <p class="muted small" id="lobby-hint"></p>
         </div>
@@ -121,11 +116,8 @@
         <button id="btn-stand-game" class="btn small-btn" hidden>Leave</button>
         <span class="spacer"></span>
         <button id="btn-side" class="btn small-btn">💬 Log</button>
+        <button id="btn-add-bot-game" class="btn small-btn">🤖 Bot</button>
         <span class="admin-only row gap">
-          <select id="bot-level-game" class="small">
-            <option value="1">L1</option><option value="2" selected>L2</option><option value="3">L3</option><option value="4">L4</option><option value="5">L5</option>
-          </select>
-          <button id="btn-add-bot-game" class="btn small-btn">+ Bot</button>
           <button id="btn-pause" class="btn small-btn">⏸ Pause</button>
           <button id="btn-end" class="btn small-btn danger">■ End game</button>
         </span>
@@ -163,6 +155,20 @@
       <label class="row gap">Or upload a picture <input type="file" id="avatar-file" accept="image/*"></label>
       <div class="row gap end"><button type="button" class="btn" id="profile-cancel">Cancel</button><button class="btn primary" value="save">Save</button></div>
     </form>
+  </dialog>
+
+  <!-- bot level picker -->
+  <dialog id="bot-dialog">
+    <h2>Add a bot</h2>
+    <p class="muted small">Pick how good it should be. You can remove bots from the Players list.</p>
+    <div class="bot-levels">
+      <button class="btn" data-level="1">🐟 1 · Fish<span>Random, calls everything</span></button>
+      <button class="btn" data-level="2">🙂 2 · Casual<span>Plays hand strength loosely</span></button>
+      <button class="btn" data-level="3">🎯 3 · Regular<span>Odds-aware, solid</span></button>
+      <button class="btn" data-level="4">🦈 4 · Shark<span>Position play, semi-bluffs</span></button>
+      <button class="btn" data-level="5">🏆 5 · Pro<span>Tight, aggressive, bluffs</span></button>
+    </div>
+    <div class="row gap end"><button type="button" class="btn" id="bot-cancel">Cancel</button></div>
   </dialog>
 
   <div id="toast" hidden></div>

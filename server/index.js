@@ -91,9 +91,9 @@ function handleAction(identity, body) {
     case 'start': admin(); return t.startGame();
     case 'pause': admin(); return t.pauseGame(!!body.pause);
     case 'end': admin(); return t.endGame();
-    case 'addBot': admin(); return t.addBot(body.level || 2);
-    case 'botLevel': admin(); return t.setBotLevel(body.id, body.level);
-    case 'kick': { admin(); const p = t.findPlayer(body.id); if (!p) return { error: 'No such player' }; return t.leave(body.id, p.isBot ? 'was removed' : 'was kicked by the admin'); }
+    case 'addBot': { const pp = playerProfile(identity); const r = t.addBot(body.level || 2); if (r.player) t.addLog(`${pp.name} added bot ${r.player.name} (L${r.player.botLevel})`); return r; }
+    case 'botLevel': return t.setBotLevel(body.id, body.level);
+    case 'kick': { const p = t.findPlayer(body.id); if (!p) return { error: 'No such player' }; if (!p.isBot) admin(); const pp = playerProfile(identity); return t.leave(body.id, p.isBot ? `was removed by ${pp.name}` : 'was kicked by the admin'); }
     case 'addTheme': {
       const pp = playerProfile(identity);
       const t = db.addTheme(identity.email, body.name, body.image);

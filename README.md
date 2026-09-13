@@ -113,7 +113,7 @@ The stack publishes **no ports** on the host: the only path to the app is throug
 2. In the **lobby**: set table settings (stack, blinds, timer, rebuys, blinds increase, theme…) → *Save settings*. Click *Sit down*. Add bots with a skill level. Friends who open the site click *Sit down* too. Then **▶ Start game**.
 3. In the game: act with Fold / Check / Call / Raise (presets: min, ½ pot, pot, max) / All-in. Timer runs out → auto check or fold. The 🎨 button queues a theme change for your next turn; 🌙/☀️ toggles dark/light just for you. 💬 Log opens the hand log, chat and player list (admin can kick / change bot levels there).
 4. Busted? The **Rebuy** bar appears; you're back in next hand with a `×2` marker. Bots auto-rebuy if enabled.
-5. Admin controls at the bottom: **+ Bot**, **⏸ Pause** (after the current hand), **■ End game** (returns bets of an unfinished hand, shows the results table in the lobby). Late-comers can *Join table* mid-game; they're dealt in next hand.
+5. Anyone can **🤖 Add bot** (you pick its level) and remove bots from the Players list. Admin controls at the bottom: **⏸ Pause** (after the current hand), **■ End game** (returns bets of an unfinished hand, shows the results table in the lobby). Late-comers can *Join table* mid-game; they're dealt in next hand.
 
 Bot levels: 1 Fish (random, calls everything) · 2 Casual · 3 Regular (Monte-Carlo equity + pot odds) · 4 Shark (position, semi-bluffs) · 5 Pro. In simulation the levels finish in strict 1 < 2 < 3 < 4 < 5 order.
 

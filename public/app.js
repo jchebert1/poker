@@ -177,8 +177,11 @@
   // ---------- lobby wiring
   $('#btn-sit').onclick = () => act({ type: 'sit' });
   $('#btn-stand').onclick = () => act({ type: 'leave' });
-  $('#btn-add-bot').onclick = () => act({ type: 'addBot', level: Number($('#bot-level').value) });
-  $('#btn-add-bot-game').onclick = () => act({ type: 'addBot', level: Number($('#bot-level-game').value) });
+  const openBotDialog = () => $('#bot-dialog').showModal();
+  $('#btn-add-bot').onclick = openBotDialog;
+  $('#btn-add-bot-game').onclick = openBotDialog;
+  $('#bot-cancel').onclick = () => $('#bot-dialog').close();
+  $$('#bot-dialog [data-level]').forEach(b => b.onclick = async () => { $('#bot-dialog').close(); const r = await act({ type: 'addBot', level: Number(b.dataset.level) }); if (r) toast(`Added ${r.player ? r.player.name : 'a bot'}`, true); });
   $('#btn-start').onclick = () => act({ type: 'start' });
   $('#btn-clear-summary').onclick = () => act({ type: 'clearSummary' });
   $('#settings-form').addEventListener('input', () => { settingsDirty = true; $('#settings-status').textContent = 'unsaved changes'; });
@@ -278,15 +281,13 @@
     for (const p of players) {
       const li = document.createElement('li'); if (p.isSelf) li.classList.add('me');
       li.innerHTML = `<div class="pl-avatar">${avatarHtml(p.avatar)}</div><div><div class="pl-name">${escapeHtml(p.name)}</div><div class="pl-tags">${p.isBot ? `<span class="tag bot">BOT · L${p.botLevel}</span>` : ''}${!p.connected && !p.isBot ? '<span class="tag off">offline</span>' : ''}<span class="tag">seat ${p.seat + 1}</span><span class="tag">${fmt(p.chips)} chips</span></div></div><span class="spacer"></span>`;
-      if (s.isAdmin) {
-        if (p.isBot) {
-          const sel = document.createElement('select'); sel.className = 'small';
-          for (let l = 1; l <= 5; l++) { const o = document.createElement('option'); o.value = l; o.textContent = 'L' + l; o.selected = l === p.botLevel; sel.appendChild(o); }
-          sel.onchange = () => act({ type: 'botLevel', id: p.id, level: Number(sel.value) });
-          li.appendChild(sel);
-        }
-        if (!p.isSelf) { const k = document.createElement('button'); k.className = 'btn small-btn'; k.textContent = p.isBot ? 'Remove' : 'Kick'; k.onclick = () => act({ type: 'kick', id: p.id }); li.appendChild(k); }
-      }
+      if (p.isBot) {
+        const sel = document.createElement('select'); sel.className = 'small';
+        for (let l = 1; l <= 5; l++) { const o = document.createElement('option'); o.value = l; o.textContent = 'L' + l; o.selected = l === p.botLevel; sel.appendChild(o); }
+        sel.onchange = () => act({ type: 'botLevel', id: p.id, level: Number(sel.value) });
+        li.appendChild(sel);
+        const k = document.createElement('button'); k.className = 'btn small-btn'; k.textContent = 'Remove'; k.onclick = () => act({ type: 'kick', id: p.id }); li.appendChild(k);
+      } else if (s.isAdmin && !p.isSelf) { const k = document.createElement('button'); k.className = 'btn small-btn'; k.textContent = 'Kick'; k.onclick = () => act({ type: 'kick', id: p.id }); li.appendChild(k); }
       ul.appendChild(li);
     }
     if (!players.length) ul.innerHTML = '<li class="muted">Nobody seated yet.</li>';
@@ -295,7 +296,7 @@
     $('#btn-sit').disabled = players.length >= s.settings.maxPlayers;
     const withChips = players.filter(p => p.chips > 0 && !p.sittingOut).length;
     $('#btn-start').disabled = withChips < 2;
-    $('#lobby-hint').textContent = s.isAdmin ? (withChips < 2 ? 'Need at least 2 players (or bots) to start.' : 'Ready when you are.') : 'Waiting for the admin to start the game.';
+    $('#lobby-hint').textContent = s.isAdmin ? (withChips < 2 ? 'Need at least 2 players (or bots) to start.' : 'Ready when you are.') : 'Anyone can add or remove bots. Waiting for the admin to start the game.';
     // settings form
     const f = $('#settings-form');
     const sel = f.theme; const wanted = s.themes.length + (s.customThemes || []).length;
@@ -433,9 +434,11 @@
     for (const p of s.seats.filter(Boolean)) {
       const li = document.createElement('div'); li.className = 'row gap';
       li.innerHTML = `<div class="pl-avatar">${avatarHtml(p.avatar)}</div><div><div class="pl-name">${escapeHtml(p.name)}</div><div class="pl-tags">${p.isBot ? `<span class="tag bot">L${p.botLevel}</span>` : ''}<span class="tag">${fmt(p.chips)}</span><span class="tag">×${p.buyIns}</span></div></div><span class="spacer"></span>`;
-      if (s.isAdmin && !p.isSelf) {
-        if (p.isBot) { const sel = document.createElement('select'); sel.className = 'small'; for (let l = 1; l <= 5; l++) { const o = document.createElement('option'); o.value = l; o.textContent = 'L' + l; o.selected = l === p.botLevel; sel.appendChild(o); } sel.onchange = () => act({ type: 'botLevel', id: p.id, level: Number(sel.value) }); li.appendChild(sel); }
-        const k = document.createElement('button'); k.className = 'btn small-btn'; k.textContent = p.isBot ? 'Remove' : 'Kick'; k.onclick = () => act({ type: 'kick', id: p.id }); li.appendChild(k);
+      if (p.isBot) {
+        const sel = document.createElement('select'); sel.className = 'small'; for (let l = 1; l <= 5; l++) { const o = document.createElement('option'); o.value = l; o.textContent = 'L' + l; o.selected = l === p.botLevel; sel.appendChild(o); } sel.onchange = () => act({ type: 'botLevel', id: p.id, level: Number(sel.value) }); li.appendChild(sel);
+        const k = document.createElement('button'); k.className = 'btn small-btn'; k.textContent = 'Remove'; k.onclick = () => act({ type: 'kick', id: p.id }); li.appendChild(k);
+      } else if (s.isAdmin && !p.isSelf) {
+        const k = document.createElement('button'); k.className = 'btn small-btn'; k.textContent = 'Kick'; k.onclick = () => act({ type: 'kick', id: p.id }); li.appendChild(k);
       }
       pl.appendChild(li);
     }

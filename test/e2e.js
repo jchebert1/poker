@@ -36,8 +36,12 @@ async function login(ctx, email) {
   // sit + bots
   await admin.click('#btn-sit');
   await friend.click('#btn-sit');
-  await admin.selectOption('#bot-level', '3');
-  for (let i = 0; i < 3; i++) { await admin.click('#btn-add-bot'); await admin.waitForTimeout(150); }
+  for (let i = 0; i < 2; i++) { await admin.click('#btn-add-bot'); await admin.click('#bot-dialog [data-level="3"]'); await admin.waitForTimeout(200); }
+  await friend.click('#btn-add-bot'); await friend.click('#bot-dialog [data-level="2"]'); await friend.waitForTimeout(300); // non-admin can add
+  await friend.click('#btn-add-bot'); await friend.click('#bot-dialog [data-level="1"]'); await friend.waitForTimeout(300);
+  const removeBtns = friend.locator('#player-list button', { hasText: 'Remove' });
+  console.log('friend sees Remove buttons:', await removeBtns.count(), 'Kick buttons:', await friend.locator('#player-list button', { hasText: 'Kick' }).count());
+  await removeBtns.last().click(); await friend.waitForTimeout(300); // non-admin can remove a bot
   await admin.waitForTimeout(400);
   await admin.screenshot({ path: `${SHOTS}/1-lobby-admin.png` });
   await friend.screenshot({ path: `${SHOTS}/2-lobby-mobile.png` });
