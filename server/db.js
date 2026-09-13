@@ -18,6 +18,14 @@ db.exec(`
     updated_at INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS themes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    image BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+  );
 `);
 
 const DEFAULT_AVATARS = ['🐻', '🦊', '🐯', '🦁', '🐸', '🐵', '🐼', '🦉', '🐺', '🦈', '🐉', '🦅', '🐙', '🦕', '🐲', '👑', '🎩', '🃏', '🎲', '💎'];
@@ -27,6 +35,11 @@ const stmts = {
   insert: db.prepare('INSERT INTO profiles (email, name, avatar, settings, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'),
   update: db.prepare('UPDATE profiles SET name = ?, avatar = ?, settings = ?, updated_at = ? WHERE email = ?'),
   kvGet: db.prepare('SELECT value FROM kv WHERE key = ?'),
+  themeList: db.prepare('SELECT t.id, t.name, t.owner, t.created_at, p.name AS ownerName FROM themes t LEFT JOIN profiles p ON p.email = t.owner ORDER BY t.created_at'),
+  themeCount: db.prepare('SELECT COUNT(*) AS n FROM themes'),
+  themeInsert: db.prepare('INSERT INTO themes (id, name, owner, mime, image, created_at) VALUES (?, ?, ?, ?, ?, ?)'),
+  themeImage: db.prepare('SELECT mime, image FROM themes WHERE id = ?'),
+  themeDelete: db.prepare('DELETE FROM themes WHERE id = ?'),
   kvSet: db.prepare('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
 };
 
@@ -67,4 +80,21 @@ function kvGet(key, fallback) {
 }
 function kvSet(key, value) { stmts.kvSet.run(key, JSON.stringify(value)); }
 
-module.exports = { getOrCreateProfile, updateProfile, kvGet, kvSet, DEFAULT_AVATARS, DATA_DIR };
+// ---------- custom (image) themes
+const MAX_THEMES = 24;
+function listThemes() { return stmts.themeList.all().map(r => ({ id: r.id, name: r.name, owner: r.owner, ownerName: r.ownerName || r.owner.split('@')[0] })); }
+function addTheme(owner, name, dataUrl) {
+  if (stmts.themeCount.get().n >= MAX_THEMES) throw new Error(`Theme limit reached (${MAX_THEMES}); ask the admin to delete one`);
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
+  if (!m) throw new Error('Upload must be a JPEG, PNG or WebP image');
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length > 1.5 * 1024 * 1024) throw new Error('Image too large (max 1.5 MB after resize)');
+  const id = require('node:crypto').randomBytes(6).toString('hex');
+  const clean = String(name || '').trim().slice(0, 24) || 'Custom theme';
+  stmts.themeInsert.run(id, clean, owner, m[1], buf, Date.now());
+  return { id, name: clean, owner };
+}
+function getThemeImage(id) { const r = stmts.themeImage.get(id); return r ? { mime: r.mime, image: r.image } : null; }
+function deleteTheme(id) { return stmts.themeDelete.run(id).changes > 0; }
+
+module.exports = { getOrCreateProfile, updateProfile, kvGet, kvSet, DEFAULT_AVATARS, DATA_DIR, listThemes, addTheme, getThemeImage, deleteTheme };

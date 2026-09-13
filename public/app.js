@@ -64,26 +64,71 @@
   };
   $('#btn-theme').onclick = (e) => { e.stopPropagation(); const m = $('#theme-menu'); m.hidden = !m.hidden; renderThemeMenu(); };
   document.addEventListener('click', (e) => { if (!e.target.closest('#theme-menu') && !e.target.closest('#btn-theme')) $('#theme-menu').hidden = true; });
+  async function pickTheme(t) {
+    if (state.phase === 'lobby' && state.isAdmin) { await act({ type: 'settings', settings: { theme: t } }); }
+    else if (!(state.me && state.me.seat !== undefined && state.me.seat !== null)) { toast('Sit down at the table to pick a theme'); return; }
+    else { const r = await act({ type: 'theme', theme: t }); if (r && !r.applied) toast('Theme queued — switches on your turn', true); }
+    $('#theme-menu').hidden = true;
+  }
   function renderThemeMenu() {
     if (!state) return;
     const list = $('#theme-list'); list.innerHTML = '';
-    const seated = state.me && state.me.seat !== undefined && state.me.seat !== null;
+    const mark = (t) => (state.theme === t ? ' current' : '') + (state.me && state.me.pendingTheme === t ? ' queued' : '');
     for (const t of state.themes) {
       const m = THEME_META[t] || { label: t, icon: '🎨', swatch: '#888' };
       const d = document.createElement('div');
-      d.className = 'theme-opt' + (state.theme === t ? ' current' : '') + (state.me && state.me.pendingTheme === t ? ' queued' : '');
+      d.className = 'theme-opt' + mark(t);
       d.innerHTML = `<span class="swatch" style="background:${m.swatch}"></span><span>${m.icon} ${m.label}</span>`;
-      d.onclick = async () => {
-        if (state.phase === 'lobby' && state.isAdmin) { await act({ type: 'settings', settings: { theme: t } }); }
-        else if (!seated) { toast('Sit down at the table to pick a theme'); return; }
-        else { const r = await act({ type: 'theme', theme: t }); if (r && !r.applied) toast('Theme queued — switches on your turn', true); }
-        $('#theme-menu').hidden = true;
-      };
+      d.onclick = () => pickTheme(t);
       list.appendChild(d);
     }
+    const cl = $('#custom-theme-list'); cl.innerHTML = '';
+    for (const c of state.customThemes || []) {
+      const t = 'custom:' + c.id;
+      const d = document.createElement('div');
+      d.className = 'theme-opt custom' + mark(t);
+      d.innerHTML = `<div class="thumb" style="background-image:url('/api/theme-image/${c.id}')"></div><div class="tname" title="by ${escapeHtml(c.ownerName)}">${escapeHtml(c.name)} <span class="muted">· ${escapeHtml(c.ownerName)}</span></div>`;
+      d.onclick = () => pickTheme(t);
+      if (state.isAdmin) {
+        const del = document.createElement('button'); del.className = 'tdel'; del.textContent = '✕'; del.title = 'Delete theme (admin)';
+        del.onclick = (e) => { e.stopPropagation(); if (confirm(`Delete theme "${c.name}" for everyone?`)) act({ type: 'deleteTheme', id: t }); };
+        d.appendChild(del);
+      }
+      cl.appendChild(d);
+    }
+    if (!(state.customThemes || []).length) cl.innerHTML = '<div class="muted small" style="grid-column:1/-1">None yet — upload a picture below.</div>';
     $('#theme-note').textContent = state.phase === 'lobby'
       ? (state.isAdmin ? 'In the lobby, your pick applies immediately as the starting theme.' : 'Your pick is queued and switches for everyone on your first turn.')
       : 'Your pick is queued and switches for everyone when it\'s your turn.';
+  }
+  $('#theme-file').onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const name = prompt('Name this theme (what everyone will see):', file.name.replace(/\.[^.]+$/, '').slice(0, 24));
+    if (name === null) { e.target.value = ''; return; }
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = async () => {
+      const MAX = 1920, scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      let q = 0.82, data = c.toDataURL('image/jpeg', q);
+      while (data.length > 1.4 * 1024 * 1024 && q > 0.4) { q -= 0.1; data = c.toDataURL('image/jpeg', q); }
+      URL.revokeObjectURL(url); e.target.value = '';
+      const r = await act({ type: 'addTheme', name, image: data });
+      if (r) { toast(`Theme "${name}" added`, true); renderThemeMenu(); }
+    };
+    img.onerror = () => { toast('Could not read that image'); e.target.value = ''; };
+    img.src = url;
+  };
+  function applyTheme(t) {
+    if (t && t.startsWith('custom:')) {
+      html.dataset.theme = 'felt';
+      html.dataset.customBg = '1';
+      html.style.setProperty('--custom-bg', `url('/api/theme-image/${t.slice(7)}')`);
+    } else {
+      html.dataset.theme = t;
+      delete html.dataset.customBg;
+      html.style.removeProperty('--custom-bg');
+    }
   }
 
   // ---------- profile
@@ -213,7 +258,7 @@
     const s = state;
     clockOffset = s.serverTime - Date.now();
     document.body.classList.toggle('is-admin', !!s.isAdmin);
-    html.dataset.theme = s.theme;
+    applyTheme(s.theme);
     $('#table-name').textContent = s.settings.tableName;
     document.title = `${s.settings.tableName} · Poker`;
     const inLobby = s.phase === 'lobby';
@@ -253,7 +298,13 @@
     $('#lobby-hint').textContent = s.isAdmin ? (withChips < 2 ? 'Need at least 2 players (or bots) to start.' : 'Ready when you are.') : 'Waiting for the admin to start the game.';
     // settings form
     const f = $('#settings-form');
-    const sel = f.theme; if (!sel.options.length) for (const t of s.themes) { const o = document.createElement('option'); o.value = t; o.textContent = (THEME_META[t] || {}).label || t; sel.appendChild(o); }
+    const sel = f.theme; const wanted = s.themes.length + (s.customThemes || []).length;
+    if (sel.options.length !== wanted) {
+      const cur = sel.value; sel.innerHTML = '';
+      for (const t of s.themes) { const o = document.createElement('option'); o.value = t; o.textContent = (THEME_META[t] || {}).label || t; sel.appendChild(o); }
+      for (const c of s.customThemes || []) { const o = document.createElement('option'); o.value = 'custom:' + c.id; o.textContent = `📷 ${c.name}`; sel.appendChild(o); }
+      if (cur) sel.value = cur;
+    }
     if (!settingsDirty) {
       for (const k of Object.keys(s.settings)) { const el = f.elements[k]; if (!el) continue; if (el.type === 'checkbox') el.checked = !!s.settings[k]; else el.value = s.settings[k]; }
     }
@@ -308,6 +359,10 @@
     const busted = s.me && s.me.busted && meSeat && meSeat.chips === 0;
     $('#rebuy-bar').hidden = !busted;
     if (busted) { $('#rebuy-amt').textContent = fmt(s.settings.startingStack); $('#btn-rebuy').hidden = !s.settings.allowRebuy; }
+    // my hand strength
+    const mh = $('#my-hand');
+    if (meSeat && meSeat.inHand && !meSeat.folded && meSeat.handDesc) { mh.hidden = false; mh.innerHTML = `<span>Your hand:</span>${escapeHtml(meSeat.handDesc)}`; }
+    else mh.hidden = true;
     // action bar
     const A = s.me && s.me.actions;
     const ab = $('#action-bar');

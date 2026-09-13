@@ -1,6 +1,6 @@
 'use strict';
 const EventEmitter = require('node:events');
-const { newDeck, evalBest, describe, cardStr } = require('./cards');
+const { newDeck, evalBest, describe, cardStr, rankOf, suitOf } = require('./cards');
 const bots = require('./bots');
 
 const MAX_SEATS = 10;
@@ -42,10 +42,21 @@ class Table extends EventEmitter {
     this.timers = {};
     this.usedBotNames = new Set();
     this.summary = null;
+    this.customThemes = []; // [{id,name,owner,ownerName}] managed by the server
     this.fast = !!settings.__fast; // test mode: no realistic delays
     delete this.settings.__fast;
   }
   _ms(ms) { return this.fast ? 1 : ms; }
+  isValidTheme(t) { return THEMES.includes(t) || (typeof t === 'string' && t.startsWith('custom:') && this.customThemes.some(c => 'custom:' + c.id === t)); }
+  setCustomThemes(list) {
+    this.customThemes = list;
+    const fix = (t) => (t && !this.isValidTheme(t) ? 'felt' : t);
+    if (fix(this.theme) !== this.theme) { this.theme = 'felt'; this.addLog('Theme was deleted; back to classic felt', 'theme'); }
+    if (fix(this.settings.theme) !== this.settings.theme) this.settings.theme = 'felt';
+    for (const p of this.players()) if (p.pendingTheme && !this.isValidTheme(p.pendingTheme)) p.pendingTheme = null;
+    this.emitChange();
+  }
+  themeLabel(t) { const c = this.customThemes.find(c => 'custom:' + c.id === t); return c ? c.name : t; }
 
   // ---------- helpers
   players() { return this.seats.filter(Boolean); }
@@ -75,7 +86,7 @@ class Table extends EventEmitter {
     if (patch.allowRebuy !== undefined) s.allowRebuy = !!patch.allowRebuy;
     if (patch.botsAutoRebuy !== undefined) s.botsAutoRebuy = !!patch.botsAutoRebuy;
     if (typeof patch.tableName === 'string') s.tableName = patch.tableName.slice(0, 40) || s.tableName;
-    if (patch.theme && THEMES.includes(patch.theme)) { s.theme = patch.theme; if (this.phase === 'lobby') this.theme = patch.theme; }
+    if (patch.theme && this.isValidTheme(patch.theme)) { s.theme = patch.theme; if (this.phase === 'lobby') this.theme = patch.theme; }
     this.settings = s;
     this.emitChange();
     return s;
@@ -156,7 +167,7 @@ class Table extends EventEmitter {
   }
 
   queueTheme(id, theme) {
-    if (!THEMES.includes(theme)) return { error: 'Unknown theme' };
+    if (!this.isValidTheme(theme)) return { error: 'Unknown theme' };
     const p = this.findPlayer(id);
     if (!p) return { error: 'Sit down first' };
     if (theme === this.theme) { p.pendingTheme = null; this.emitChange(); return { ok: true, applied: true }; }
@@ -169,7 +180,7 @@ class Table extends EventEmitter {
   _applyPendingTheme(p) {
     if (p.pendingTheme && p.pendingTheme !== this.theme) {
       this.theme = p.pendingTheme;
-      this.addLog(`${p.name} switched the theme to "${p.pendingTheme}"`, 'theme');
+      this.addLog(`${p.name} switched the theme to "${this.themeLabel(p.pendingTheme)}"`, 'theme');
     }
     p.pendingTheme = null;
   }
@@ -596,6 +607,15 @@ class Table extends EventEmitter {
     });
   }
 
+  _liveHandDesc(hole, community) {
+    if (hole.length < 2) return null;
+    if (community.length >= 3) return describe(evalBest(hole.concat(community)));
+    const N = ['Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King', 'Ace'];
+    const r = hole.map(rankOf).sort((a, b) => b - a);
+    if (r[0] === r[1]) return `Pair of ${N[r[0]]}s`;
+    return `${N[r[0]]}-${N[r[1]]}${suitOf(hole[0]) === suitOf(hole[1]) ? ' suited' : ''}`;
+  }
+
   // ---------- chat
   addChat(from, text) {
     this.chat.push({ t: Date.now(), from, text: String(text).slice(0, 300) });
@@ -616,7 +636,7 @@ class Table extends EventEmitter {
         connected: p.connected, folded: p.folded, allIn: p.allIn, bet: p.bet, totalBet: p.totalBet, inHand: p.inHand, busted: p.busted || (p.chips <= 0 && !p.inHand),
         sittingOut: p.sittingOut, lastAction: p.lastAction, pendingTheme: isSelf ? p.pendingTheme : (p.pendingTheme ? true : null),
         cards: reveal ? p.holeCards.map(cardStr) : p.holeCards.map(() => 'XX'),
-        handDesc: (reveal && p.handResult) ? p.handResult.desc : null,
+        handDesc: (reveal && p.handResult) ? p.handResult.desc : (isSelf && p.inHand && !p.folded && hand ? this._liveHandDesc(p.holeCards, hand.community) : null),
         bestCards: (reveal && p.handResult && showAll) ? p.handResult.cards.map(cardStr) : null,
         isSelf,
       };
@@ -633,7 +653,7 @@ class Table extends EventEmitter {
     }
     return {
       serverTime: Date.now(),
-      phase: this.phase, pauseRequested: this.pauseRequested, theme: this.theme, settings: this.settings, themes: THEMES,
+      phase: this.phase, pauseRequested: this.pauseRequested, theme: this.theme, settings: this.settings, themes: THEMES, customThemes: this.customThemes,
       blinds: this.currentBlinds(), handNumber: this.handNumber, seats, maxSeats: MAX_SEATS,
       hand: hand ? {
         number: hand.number, street: hand.street, community: hand.community.map(cardStr), pot: hand.pot, potOnTable, currentBet: hand.currentBet,

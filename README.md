@@ -6,7 +6,8 @@ Self-hosted **No-Limit Texas Hold'em** for you and your friends, in the browser,
 - **Lobby / start screen** where the admin sets table rules and starts, pauses, and ends the game
 - **Player profiles** keyed by the Google account Cloudflare Access verified: display name + avatar (emoji or uploaded picture) persist across sessions
 - **Rebuys** for busted players (same starting stack) with a `×N` buy-in marker on the seat
-- **Dark/light mode** (per player) and **six table themes** (felt, nature, city, retro, space, ocean); a player's theme pick is queued and switches for everyone when their turn comes up
+- **Dark/light mode** (per player) and **six table themes** (felt, nature, city, retro, space, ocean) plus **custom image themes**: any player uploads a picture (🎨 menu), it's stored on the server and shows up in everyone's picker; only the admin can delete one. A player's theme pick is queued and switches for everyone when their turn comes up
+- **Live hand strength**: a "Your hand: …" strip and a label under your cards (e.g. *Flush, King high*) updated every street
 - **Side pots**, blinds schedule, action timer with auto check/fold, chat and hand log
 - Desktop first, but works on a phone
 - **Zero npm dependencies** — Node built-ins only (HTTP, Server-Sent Events, `node:sqlite`, `crypto`). Nothing to audit, tiny image.

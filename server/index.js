@@ -13,6 +13,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 // ---------- the one table
 const table = new Table(db.kvGet('tableSettings', {}));
+table.customThemes = db.listThemes();
 table.on('change', scheduleBroadcast);
 
 // ---------- SSE hub
@@ -41,7 +42,7 @@ function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(s);
 }
-function readBody(req, limit = 512 * 1024) {
+function readBody(req, limit = 2200 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
     req.on('data', c => { size += c.length; if (size > limit) { reject(new Error('Body too large')); req.destroy(); } else chunks.push(c); });
@@ -93,6 +94,20 @@ function handleAction(identity, body) {
     case 'addBot': admin(); return t.addBot(body.level || 2);
     case 'botLevel': admin(); return t.setBotLevel(body.id, body.level);
     case 'kick': { admin(); const p = t.findPlayer(body.id); if (!p) return { error: 'No such player' }; return t.leave(body.id, p.isBot ? 'was removed' : 'was kicked by the admin'); }
+    case 'addTheme': {
+      const pp = playerProfile(identity);
+      const t = db.addTheme(identity.email, body.name, body.image);
+      table.setCustomThemes(db.listThemes());
+      table.addLog(`${pp.name} added a new theme "${t.name}"`, 'theme');
+      return { ok: true, id: 'custom:' + t.id };
+    }
+    case 'deleteTheme': {
+      admin();
+      const id = String(body.id || '').replace(/^custom:/, '');
+      if (!db.deleteTheme(id)) return { error: 'No such theme' };
+      table.setCustomThemes(db.listThemes());
+      return { ok: true };
+    }
     case 'clearSummary': admin(); t.summary = null; t.emitChange(); return { ok: true };
     default: return { error: 'Unknown action type' };
   }
@@ -155,6 +170,13 @@ const server = http.createServer(async (req, res) => {
           if (connectedCount(identity.email) === 0) table.setConnected(identity.email, false);
         });
         return;
+      }
+      const tm = /^\/api\/theme-image\/([a-f0-9]{12})$/.exec(p);
+      if (tm && req.method === 'GET') {
+        const img = db.getThemeImage(tm[1]);
+        if (!img) return json(res, 404, { error: 'not found' });
+        res.writeHead(200, { 'Content-Type': img.mime, 'Content-Length': img.image.length, 'Cache-Control': 'private, max-age=31536000, immutable' });
+        return res.end(Buffer.from(img.image));
       }
       return json(res, 404, { error: 'not found' });
     }

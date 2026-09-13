@@ -51,9 +51,16 @@ async function login(ctx, email) {
   await friend.waitForSelector('#game', { state: 'visible' });
   console.log('game started');
 
-  // friend queues a theme
+  // friend uploads a custom image theme and queues it
+  const png = require('node:fs').readFileSync(process.env.THEME_IMG || '/tmp/shots/theme-test.jpg');
   await friend.click('#btn-theme');
-  await friend.click('.theme-opt:nth-child(3)'); // city
+  friend.once('dialog', d => d.accept('Test Beach'));
+  await friend.setInputFiles('#theme-file', { name: 'beach.jpg', mimeType: 'image/jpeg', buffer: png });
+  await friend.waitForTimeout(1500);
+  const customCount = await friend.locator('#custom-theme-list .theme-opt').count();
+  console.log('custom themes listed:', customCount);
+  if (customCount !== 1) throw new Error('custom theme not listed');
+  await friend.click('#custom-theme-list .theme-opt');
   await friend.waitForTimeout(300);
 
   // play: whenever an action bar shows for either human, act (call/check mostly, raise sometimes)
@@ -74,13 +81,19 @@ async function login(ctx, email) {
   while (Date.now() - t0 < 90000) {
     await maybeAct(admin, 'admin');
     await maybeAct(friend, 'friend');
-    const theme = await friend.evaluate(() => document.documentElement.dataset.theme);
-    if (theme === 'city' && !themeSwitched) { themeSwitched = true; console.log('theme switched to city after', Math.round((Date.now() - t0) / 1000), 's'); await admin.screenshot({ path: `${SHOTS}/3-game-city.png` }); await friend.screenshot({ path: `${SHOTS}/4-game-mobile.png` }); }
+    const theme = await friend.evaluate(() => document.documentElement.dataset.customBg ? 'custom' : document.documentElement.dataset.theme);
+    if (theme === 'custom' && !themeSwitched) { themeSwitched = true; console.log('theme switched to city after', Math.round((Date.now() - t0) / 1000), 's'); await admin.screenshot({ path: `${SHOTS}/3-game-city.png` }); await friend.screenshot({ path: `${SHOTS}/4-game-mobile.png` }); }
     const hn = await admin.evaluate(() => document.querySelector('#blinds-pill').textContent);
     if (/Hand #6/.test(hn)) break;
     await admin.waitForTimeout(400);
   }
   console.log('human actions taken:', acts, 'themeSwitched:', themeSwitched);
+  const handTxt = await admin.locator('#my-hand').textContent().catch(() => '');
+  console.log('my-hand strip:', handTxt);
+  // admin deletes the custom theme -> table falls back to felt
+  await admin.click('#btn-theme'); admin.once('dialog', d => d.accept()); await admin.click('#custom-theme-list .tdel'); await admin.waitForTimeout(500);
+  console.log('theme after delete:', await admin.evaluate(() => document.documentElement.dataset.customBg ? 'custom' : document.documentElement.dataset.theme));
+  await admin.mouse.click(5, 400); await admin.waitForTimeout(200);
   await admin.screenshot({ path: `${SHOTS}/5-game-admin.png` });
   // dark/light + side panel
   await admin.click('#btn-mode'); await admin.click('#btn-side'); await admin.waitForTimeout(300);

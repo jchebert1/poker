@@ -87,6 +87,7 @@
       <div id="result-banner" class="banner" hidden></div>
       <div id="paused-banner" class="banner" hidden>⏸ Game paused by admin</div>
 
+      <div id="my-hand" class="banner" hidden></div>
       <div id="action-bar" hidden>
         <div class="row gap actions-main">
           <button class="btn danger" data-act="fold">Fold</button>
@@ -145,6 +146,9 @@
   <div id="theme-menu" class="popover" hidden>
     <div class="popover-title">Table theme</div>
     <div id="theme-list"></div>
+    <div class="popover-title" style="margin-top:.6rem">Custom themes <span class="muted small">(uploaded by players)</span></div>
+    <div id="custom-theme-list"></div>
+    <label class="btn small-btn upload-btn">📷 Upload a picture<input type="file" id="theme-file" accept="image/*" hidden></label>
     <p class="muted small" id="theme-note">Your pick is queued and switches for everyone when it's your turn.</p>
   </div>
 
