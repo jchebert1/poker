@@ -188,8 +188,11 @@
     const mobile = window.innerWidth <= 860;
     const rect = $('#table').getBoundingClientRect();
     const W = rect.width || 1000, H = rect.height || 600;
-    const rx = (mobile ? 42 : 46) * W / 100, ry = (mobile ? 47 : 48) * H / 100, E = 2 / 2.6; // superellipse: straighter sides so side seats don't stack
-    const key = `${n}:${Math.round(W)}:${Math.round(H)}:${mobile}`;
+    // keep every seat box fully inside the #table box: radius = half-size minus half a seat box
+    const probe = $('#seats .seat:not([hidden]) .seat-box');
+    const seatW = probe ? probe.parentElement.offsetWidth : (mobile ? 92 : 136), seatH = probe ? probe.parentElement.offsetHeight + 24 : (mobile ? 118 : 165);
+    const rx = W / 2 - seatW / 2 - 2, ry = H / 2 - seatH / 2 - 2, E = 2 / 2.6; // superellipse: straighter sides so side seats don't stack
+    const key = `${n}:${Math.round(W)}:${Math.round(H)}:${seatW}:${seatH}`;
     if (!arcCache[key]) {
       const N = 1440, pts = [], len = [0];
       for (let i = 0; i <= N; i++) {
