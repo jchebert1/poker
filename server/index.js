@@ -9,6 +9,12 @@ const { Table, THEMES } = require('./engine/table');
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+// Asset version = hash of the client files, so every deploy gets fresh URLs (Cloudflare/browsers cache js/css aggressively).
+const ASSET_VERSION = (() => {
+  const h = require('node:crypto').createHash('sha1');
+  for (const f of ['app.js', 'styles.css']) { try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {} }
+  return h.digest('hex').slice(0, 10);
+})();
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 
 // ---------- the one table
@@ -58,7 +64,14 @@ function serveStatic(req, res, urlPath) {
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
     const ext = path.extname(file).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300' });
+    if (ext === '.html') {
+      // inject the asset version into script/style references; HTML itself is never cached
+      const html = fs.readFileSync(file, 'utf8').replace(/(href|src)="(\/?)(styles\.css|app\.js)"/g, `$1="$2$3?v=${ASSET_VERSION}"`);
+      res.writeHead(200, { 'Content-Type': MIME[ext], 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+      return res.end(html);
+    }
+    const versioned = req.url.includes('?v=');
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': versioned ? 'public, max-age=31536000, immutable' : 'no-cache' });
     fs.createReadStream(file).pipe(res);
   });
 }
@@ -188,6 +201,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`poker server listening on :${PORT}  auth=${auth.MODE}  admins=${auth.ADMIN_EMAILS.join(',') || '(none)'}  data=${db.DATA_DIR}`);
+  console.log(`poker server listening on :${PORT}  assets=v${ASSET_VERSION}  auth=${auth.MODE}  admins=${auth.ADMIN_EMAILS.join(',') || '(none)'}  data=${db.DATA_DIR}`);
 });
 process.on('SIGTERM', () => { console.log('shutting down'); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 2000); });
