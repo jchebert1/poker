@@ -131,6 +131,75 @@
     }
   }
 
+
+  // ---------- sound effects (synthesized with Web Audio; nothing to download)
+  const sfx = (() => {
+    let ctx = null, enabled = true, master = null;
+    try { enabled = localStorage.getItem('sound') !== 'off'; } catch {}
+    const ensure = () => {
+      if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.45; master.connect(ctx.destination); }
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      return ctx;
+    };
+    const unlock = () => { ensure(); };
+    ['pointerdown', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, unlock, { once: false, passive: true }));
+    let noiseBuf = null;
+    const noise = () => { if (!noiseBuf) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } const s = ctx.createBufferSource(); s.buffer = noiseBuf; return s; };
+    const env = (node, t0, a, d, peak = 1) => { const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d); node.connect(g); g.connect(master); return g; };
+    const tone = (freq, t0, a, d, type = 'sine', peak = 0.6, slideTo = null) => { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t0); if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + a + d); env(o, t0, a, d, peak); o.start(t0); o.stop(t0 + a + d + 0.05); };
+    const burst = (t0, a, d, filterFreq, q = 1, peak = 0.8, type = 'bandpass') => { const n = noise(); const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = filterFreq; f.Q.value = q; n.connect(f); env(f, t0, a, d, peak); n.start(t0); n.stop(t0 + a + d + 0.05); };
+    const play = (fn) => { if (!enabled) return; const c = ensure(); if (!c || c.state !== 'running') return; try { fn(c.currentTime + 0.01); } catch (e) { /* ignore */ } };
+    const chip = (t, n = 3, gap = 0.045) => { for (let i = 0; i < n; i++) { const tt = t + i * gap + Math.random() * 0.01; burst(tt, 0.003, 0.05, 3800 + Math.random() * 1500, 6, 1.0); tone(2400 + Math.random() * 900, tt, 0.002, 0.04, 'triangle', 0.25); } };
+    const cardFlip = (t) => { burst(t, 0.004, 0.06, 1800, 1.2, 0.5, 'highpass'); tone(900, t, 0.003, 0.03, 'triangle', 0.08, 500); };
+    return {
+      get enabled() { return enabled; },
+      toggle() { enabled = !enabled; try { localStorage.setItem('sound', enabled ? 'on' : 'off'); } catch {} if (enabled) this.check(); return enabled; },
+      shuffle() { play(t => { for (let i = 0; i < 22; i++) { const tt = t + i * 0.028 + Math.random() * 0.006; burst(tt, 0.002, 0.03, 2500 + Math.random() * 2500, 2, 0.35 + Math.random() * 0.2, 'highpass'); } for (let i = 0; i < 3; i++) cardFlip(t + 0.75 + i * 0.12); }); },
+      deal(n = 1) { play(t => { for (let i = 0; i < n; i++) cardFlip(t + i * 0.11); }); },
+      bet() { play(t => chip(t, 3)); },
+      call() { play(t => chip(t, 2)); },
+      raise() { play(t => chip(t, 5, 0.04)); },
+      allin() { play(t => { chip(t, 10, 0.035); tone(220, t, 0.02, 0.5, 'sawtooth', 0.12, 110); }); },
+      check() { play(t => { burst(t, 0.002, 0.05, 700, 1.5, 1.0, 'lowpass'); burst(t + 0.11, 0.002, 0.05, 650, 1.5, 0.9, 'lowpass'); }); },
+      fold() { play(t => burst(t, 0.02, 0.16, 1200, 0.8, 0.7, 'bandpass')); },
+      turn() { play(t => { tone(880, t, 0.01, 0.18, 'sine', 0.5); tone(1320, t + 0.12, 0.01, 0.25, 'sine', 0.4); }); },
+      win() { play(t => { [523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.09, 0.01, 0.35, 'triangle', 0.45)); chip(t + 0.3, 8, 0.05); }); },
+      lose() { play(t => { tone(440, t, 0.01, 0.25, 'sine', 0.25, 392); }); },
+      chat() { play(t => tone(1500, t, 0.005, 0.08, 'sine', 0.25, 1900)); },
+      tick() { play(t => burst(t, 0.002, 0.03, 2000, 3, 0.3, 'bandpass')); },
+      bust() { play(t => { tone(300, t, 0.02, 0.5, 'sawtooth', 0.2, 80); }); },
+    };
+  })();
+  $('#btn-sound').textContent = sfx.enabled ? '🔊' : '🔇';
+  $('#btn-sound').onclick = () => { const on = sfx.toggle(); $('#btn-sound').textContent = on ? '🔊' : '🔇'; toast(on ? 'Sound on' : 'Sound off', true); };
+
+  // fire sounds by diffing consecutive states
+  let prevSnap = null, lastTickSec = null;
+  function soundDiff(s) {
+    const snap = {
+      hand: s.hand ? s.hand.number : 0, street: s.hand ? s.hand.street : '', comm: s.hand ? s.hand.community.length : 0,
+      results: !!(s.hand && s.hand.results), myTurn: !!(s.me && s.me.actions), chat: s.chat.length, busted: !!(s.me && s.me.busted),
+      acts: s.seats.map(p => p ? p.lastAction : null), bets: s.seats.map(p => p ? p.bet : 0),
+    };
+    const p = prevSnap; prevSnap = snap;
+    if (!p) return;
+    if (snap.hand !== p.hand && snap.hand > 0) { sfx.shuffle(); return; }
+    if (snap.comm > p.comm) sfx.deal(snap.comm - p.comm);
+    if (snap.results && !p.results && s.hand.results) { const me = s.me && s.me.id; const iWon = s.hand.results.winners.some(w => w.id === me); if (iWon) sfx.win(); else if (s.hand.results.showdown) sfx.lose(); else sfx.call(); }
+    for (let i = 0; i < snap.acts.length; i++) {
+      const a = snap.acts[i]; if (!a || a === p.acts[i]) continue;
+      if (/^All-in/.test(a)) sfx.allin();
+      else if (/^Raise/.test(a)) sfx.raise();
+      else if (/^Bet/.test(a)) sfx.bet();
+      else if (/^Call/.test(a)) sfx.call();
+      else if (a === 'Check') sfx.check();
+      else if (a === 'Fold') sfx.fold();
+    }
+    if (snap.myTurn && !p.myTurn) sfx.turn();
+    if (snap.chat > p.chat && s.chat.length) { const last = s.chat[s.chat.length - 1]; if (!me || last.from.name !== me.name) sfx.chat(); }
+    if (snap.busted && !p.busted) sfx.bust();
+  }
+
   // ---------- profile
   let pendingAvatar = null;
   $('#btn-profile').onclick = () => openProfile();
@@ -270,6 +339,7 @@
     $('#blinds-pill').textContent = `Hand #${s.handNumber} · Blinds ${fmt(s.blinds.sb)}/${fmt(s.blinds.bb)}`;
     if (inLobby) renderLobby(); else renderGame();
     renderSide();
+    soundDiff(s);
     if (!$('#theme-menu').hidden) renderThemeMenu();
   }
 
@@ -457,7 +527,7 @@
     const now = Date.now() + clockOffset;
     for (const i of $$('.seat .timer i')) { const left = Math.max(0, Number(i.dataset.deadline) - now); i.style.width = (left / Number(i.dataset.total) * 100) + '%'; }
     const A = state.me && state.me.actions;
-    if (A && A.deadline) { const left = Math.max(0, A.deadline - now); $('#timer-fill').style.width = (left / (state.settings.actionTimeSec * 1000) * 100) + '%'; }
+    if (A && A.deadline) { const left = Math.max(0, A.deadline - now); $('#timer-fill').style.width = (left / (state.settings.actionTimeSec * 1000) * 100) + '%'; const sec = Math.ceil(left / 1000); if (sec <= 5 && sec > 0 && sec !== lastTickSec) { lastTickSec = sec; sfx.tick(); } } else lastTickSec = null;
   }, 500);
   window.addEventListener('resize', () => { if (state && state.phase !== 'lobby') renderGame(); });
 

@@ -8,6 +8,7 @@ Self-hosted **No-Limit Texas Hold'em** for you and your friends, in the browser,
 - **Rebuys** for busted players (same starting stack) with a `×N` buy-in marker on the seat
 - **Dark/light mode** (per player) and **six table themes** (felt, nature, city, retro, space, ocean) plus **custom image themes**: any player uploads a picture (🎨 menu), it's stored on the server and shows up in everyone's picker; only the admin can delete one. A player's theme pick is queued and switches for everyone when their turn comes up
 - **Live hand strength**: a "Your hand: …" strip and a label under your cards (e.g. *Flush, King high*) updated every street
+- **Sound effects** (shuffle, deal, chips, check, fold, your-turn chime, win jingle, countdown ticks) synthesized in the browser; 🔊 toggle per player
 - **Side pots**, blinds schedule, action timer with auto check/fold, chat and hand log
 - Desktop first, but works on a phone
 - **Zero npm dependencies** — Node built-ins only (HTTP, Server-Sent Events, `node:sqlite`, `crypto`). Nothing to audit, tiny image.
